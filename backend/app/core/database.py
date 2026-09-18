@@ -10,16 +10,28 @@ from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
 
+import re
+
 # Normalize Render / cloud Postgres URLs to postgresql+asyncpg://
 _db_url = settings.DATABASE_URL
+
+# Strip sslmode query param from URL because asyncpg expects it via connect_args
+if "sslmode=" in _db_url:
+    _db_url = re.sub(r'[\?&]sslmode=[^&]*', '', _db_url)
+    if "?" not in _db_url and "&" in _db_url:
+        _db_url = _db_url.replace("&", "?", 1)
+
 if _db_url.startswith("postgres://"):
     _db_url = _db_url.replace("postgres://", "postgresql+asyncpg://", 1)
 elif _db_url.startswith("postgresql://") and not _db_url.startswith("postgresql+asyncpg://"):
     _db_url = _db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-# SQLite needs connect_args for async; Postgres does not.
 _is_sqlite = _db_url.startswith("sqlite")
-_connect_args = {"check_same_thread": False} if _is_sqlite else {}
+if _is_sqlite:
+    _connect_args = {"check_same_thread": False}
+else:
+    # Render and cloud PostgreSQL require SSL
+    _connect_args = {"ssl": "require"}
 
 engine = create_async_engine(
     _db_url,

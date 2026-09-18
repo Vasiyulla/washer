@@ -9,8 +9,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create non-root user
-RUN adduser --disabled-password --gecos "" appuser
+# Create non-root user and grant ownership of /app
+RUN adduser --disabled-password --gecos "" appuser && \
+    chown -R appuser:appuser /app
+
 USER appuser
 
 ENV PORT=8000
