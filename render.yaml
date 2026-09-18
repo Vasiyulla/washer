@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: smartwash-api
+    runtime: docker
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smartwash-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEVICE_API_KEY
+        value: smartwash-device-secret-key-prod
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 1440
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: 30
+      - key: TELEMETRY_RATE_LIMIT
+        value: 120/minute
+
+databases:
+  - name: smartwash-db
+    plan: free
+    databaseName: smartwash
+    user: smartwash

@@ -1,0 +1,27 @@
+# Python & Virtualenv
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+backend/smartwash.db
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment Variables
+.env
+!.env.example
+
+# PlatformIO / Firmware
+.pio/
+.vscode/
+.idea/
+
+# OS Files
+.DS_Store
+Thumbs.db
+backend/app - Shortcut.lnk

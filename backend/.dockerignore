@@ -1,0 +1,15 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+smartwash.db
+*.db
+*.sqlite3
+.git/
+.gitignore
+.pytest_cache/
+.coverage
+htmlcov/
