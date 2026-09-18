@@ -31,7 +31,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 // Backend API
 // ═══════════════════════════════════════════════════════════════════════════════
-#define API_BASE_URL    "https://your-cloud-run-url.run.app"
+#define API_BASE_URL    "https://washer-u2y9.onrender.com"
 #define TELEMETRY_PATH  "/api/v1/telemetry"
 #define HEARTBEAT_PATH  "/api/v1/devices/" DEVICE_CODE "/heartbeat"
 
@@ -39,15 +39,17 @@
 // Device Identity
 // ═══════════════════════════════════════════════════════════════════════════════
 #define DEVICE_CODE     "ESP32-001"
-#define DEVICE_API_KEY  "dev-device-key-change-in-production"
+#define DEVICE_API_KEY  "smartwash-device-secret-key-prod"
 #define FIRMWARE_VER    "1.0.0"
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Accelerometer (MPU6050) Pin Mapping
+// Accelerometer (ADXL345) I2C Pin Mapping
 // ═══════════════════════════════════════════════════════════════════════════════
-// Default I2C pins on most ESP32 dev boards. Change if using custom wiring.
-#define MPU_SDA_PIN     21
-#define MPU_SCL_PIN     22
+// Default I2C pins on most ESP32 dev boards (SDA=21, SCL=22).
+#define ADXL_SDA_PIN    21
+#define ADXL_SCL_PIN    22
+#define MPU_SDA_PIN     ADXL_SDA_PIN
+#define MPU_SCL_PIN     ADXL_SCL_PIN
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Sampling & Reporting

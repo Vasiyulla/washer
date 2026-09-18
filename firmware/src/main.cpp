@@ -7,7 +7,7 @@
  * Boot sequence:
  *   1. WiFi connect (WiFiManager captive portal)
  *   2. NTP time sync
- *   3. MPU6050 initialization
+ *   3. ADXL345 initialization
  *   4. Main loop: read → evaluate → report
  */
 

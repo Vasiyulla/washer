@@ -8,8 +8,8 @@
 
 #include "vibration.h"
 #include "config.h"
-#include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
+#include <Adafruit_ADXL345_U.h>
 #include <Wire.h>
 #include <math.h>
 
@@ -23,7 +23,7 @@ static const int WINDOW_SIZE = 100;  // enough for 15s at ~6 samples/sec
 
 // ── Module State ─────────────────────────────────────────────────────────────
 
-static Adafruit_MPU6050 mpu;
+static Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
 static MachineState currentState = STATE_IDLE;
 
 // Rolling window: circular buffer of (timestamp_ms, deviation) pairs
@@ -76,19 +76,19 @@ static bool windowCheck(float threshold, int duration_sec, bool above) {
 // ── Public API Implementation ────────────────────────────────────────────────
 
 bool initAccelerometer() {
-    Wire.begin(MPU_SDA_PIN, MPU_SCL_PIN);
+    Wire.begin(ADXL_SDA_PIN, ADXL_SCL_PIN);
 
-    if (!mpu.begin()) {
-        Serial.println("[VIBRATION] ERROR: MPU6050 not found! Check wiring.");
+    // Try default I2C address 0x53, fallback to 0x1D if ALT ADDRESS is tied high
+    if (!accel.begin(0x53) && !accel.begin(0x1D)) {
+        Serial.println("[VIBRATION] ERROR: ADXL345 not found! Check I2C wiring (SDA=21, SCL=22).");
         return false;
     }
 
-    // Configure sensor ranges
-    mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
-    mpu.setGyroRange(MPU6050_RANGE_500_DEG);
-    mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+    // Configure sensor ranges: ±16g provides plenty of dynamic range for violent spin cycles
+    accel.setRange(ADXL345_RANGE_16_G);
+    accel.setDataRate(ADXL345_DATARATE_100_HZ);
 
-    Serial.println("[VIBRATION] MPU6050 initialized");
+    Serial.println("[VIBRATION] ADXL345 accelerometer initialized successfully");
     Serial.printf("[VIBRATION] Start threshold: %.2f, Stop threshold: %.2f\n",
                   START_THRESHOLD, STOP_THRESHOLD);
     Serial.printf("[VIBRATION] Start duration: %ds, Stop duration: %ds\n",
@@ -98,13 +98,13 @@ bool initAccelerometer() {
 }
 
 VibrationReading readVibration() {
-    sensors_event_t accel, gyro, temp;
-    mpu.getEvent(&accel, &gyro, &temp);
+    sensors_event_t event;
+    accel.getEvent(&event);
 
     VibrationReading reading;
-    reading.x = accel.acceleration.x;
-    reading.y = accel.acceleration.y;
-    reading.z = accel.acceleration.z;
+    reading.x = event.acceleration.x;
+    reading.y = event.acceleration.y;
+    reading.z = event.acceleration.z;
     reading.magnitude = sqrtf(
         reading.x * reading.x +
         reading.y * reading.y +
