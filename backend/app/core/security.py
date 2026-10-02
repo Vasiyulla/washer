@@ -77,10 +77,15 @@ def decode_token(token: str) -> dict:
 # ── FastAPI Dependencies ─────────────────────────────────────────────────────
 
 async def get_current_user(
-    authorization: Annotated[str, Header()],
+    authorization: Annotated[Optional[str], Header()] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """Extract and validate the user from the Authorization: Bearer <token> header."""
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header is required",
+        )
     if not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

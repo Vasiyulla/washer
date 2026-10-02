@@ -9,11 +9,13 @@ import android.util.Log
 import com.example.data.api.ApiClient
 import com.example.data.api.CycleResponse
 import com.example.data.api.HealthResponse
+import com.example.data.api.LoginRequest
 import com.example.data.api.MachineCreate
 import com.example.data.api.MachineResponse
-import com.example.data.api.MachineStatusResponse
 import com.example.data.api.NotificationResponse
+import com.example.data.api.RegisterRequest
 import com.example.data.api.TelemetryResponse
+import com.example.data.api.WashApiService
 import com.example.data.config.AppConfig
 import com.example.data.model.ConnectionState
 import com.example.data.model.Device
@@ -139,6 +141,10 @@ class MachineRepository(
     fun selectMachine(machine: Machine) {
         _selectedMachine.value = machine
         webSocketClient.connect(machine.id)
+        scope.launch {
+            pollMachineStatusAndTelemetry(machine.id)
+            pollCyclesAndHealth(machine.id)
+        }
     }
 
     fun selectMachine(machineId: String) {
@@ -147,6 +153,10 @@ class MachineRepository(
             selectMachine(found)
         } else {
             webSocketClient.connect(machineId)
+            scope.launch {
+                pollMachineStatusAndTelemetry(machineId)
+                pollCyclesAndHealth(machineId)
+            }
         }
     }
 
@@ -219,23 +229,21 @@ class MachineRepository(
 
     private suspend fun fetchMachinesAndBootstrap() {
         var service = apiClient.createService()
+
+        // 1. Proactive Authentication: If token is missing, authenticate immediately
+        if (config.authToken.isNullOrBlank()) {
+            authenticateDemoUser(service)
+            service = apiClient.createService()
+        }
+
         var resp = service.getMachines()
 
-        // Enterprise auto-recovery: If unauthenticated (401), authenticate with demo user seamlessly
-        if (resp.code() == 401) {
-            Log.i(tag, "Session expired or unauthenticated. Auto-authenticating with demo credentials...")
-            try {
-                val loginResp = service.login(LoginRequest("demo@smartwash.io", "demo1234"))
-                if (loginResp.isSuccessful && loginResp.body() != null) {
-                    config.authToken = loginResp.body()!!.accessToken
-                    config.userEmail = "demo@smartwash.io"
-                    config.userName = "Demo User"
-                    service = apiClient.createService()
-                    resp = service.getMachines()
-                }
-            } catch (e: Exception) {
-                Log.w(tag, "Auto-authentication failed: ${e.message}")
-            }
+        // 2. Reactive Auto-recovery: If unauthorized/invalid token (401, 403, or 422)
+        if (resp.code() == 401 || resp.code() == 403 || resp.code() == 422) {
+            Log.i(tag, "Session expired or rejected (${resp.code()}). Re-authenticating...")
+            authenticateDemoUser(service)
+            service = apiClient.createService()
+            resp = service.getMachines()
         }
 
         if (resp.isSuccessful && resp.body() != null) {
@@ -260,11 +268,35 @@ class MachineRepository(
 
             if (list.isNotEmpty()) {
                 _machines.value = list
-                if (_selectedMachine.value == null) {
-                    _selectedMachine.value = list[0]
-                    webSocketClient.connect(list[0].id)
+                val current = _selectedMachine.value
+                val selected = if (current != null) {
+                    list.find { it.id == current.id } ?: list[0]
+                } else {
+                    list[0]
                 }
+                _selectedMachine.value = selected
+                webSocketClient.connect(selected.id)
             }
+        }
+    }
+
+    private suspend fun authenticateDemoUser(service: WashApiService) {
+        try {
+            var loginResp = service.login(LoginRequest("demo@smartwash.io", "demo1234"))
+            if (!loginResp.isSuccessful) {
+                // Register if the account doesn't exist on this cloud container yet
+                loginResp = service.register(RegisterRequest("Demo User", "demo@smartwash.io", "demo1234"))
+            }
+            if (loginResp.isSuccessful && loginResp.body() != null) {
+                config.authToken = loginResp.body()!!.accessToken
+                config.userEmail = "demo@smartwash.io"
+                config.userName = "Demo User"
+                Log.i(tag, "Authentication successful! Token saved.")
+            } else {
+                Log.w(tag, "Authentication failed with code: ${loginResp.code()}")
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Authentication exception: ${e.message}", e)
         }
     }
 
@@ -360,17 +392,6 @@ class MachineRepository(
             }
         } catch (e: Exception) {
             Log.w(tag, "Notifications fetch error: ${e.message}")
-        }
-    }
-
-    fun selectMachine(machineId: String) {
-        val found = _machines.value.find { it.id == machineId }
-        if (found != null) {
-            _selectedMachine.value = found
-            scope.launch {
-                pollMachineStatusAndTelemetry(found.id)
-                pollCyclesAndHealth(found.id)
-            }
         }
     }
 

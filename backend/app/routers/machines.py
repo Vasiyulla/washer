@@ -2,7 +2,7 @@
 Machines router — all endpoints scoped to the authenticated user's machines.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -63,13 +63,27 @@ async def get_machine_status(
 ):
     machine = await machine_service.get_machine_for_user(db, user, machine_id)
     device = machine.device
+
+    is_online = False
+    if device and device.is_online and device.last_heartbeat:
+        last = device.last_heartbeat
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        timeout = machine.offline_timeout_seconds or 90
+        is_online = (now - last).total_seconds() <= timeout
+
+    current_status = machine.current_status
+    if not is_online and current_status != "RUNNING":
+        current_status = "OFFLINE"
+
     return MachineStatus(
         machine_id=machine.id,
         machine_code=machine.machine_code,
         name=machine.name,
-        current_status=machine.current_status,
+        current_status=current_status,
         last_known_status=machine.last_known_status,
-        device_online=device.is_online if device else False,
+        device_online=is_online,
         last_heartbeat=device.last_heartbeat if device else None,
     )
 

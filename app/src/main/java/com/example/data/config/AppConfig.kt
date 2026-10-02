@@ -19,7 +19,7 @@ class AppConfig(context: Context) {
         const val KEY_USER_EMAIL = "key_user_email"
         const val KEY_USER_NAME = "key_user_name"
         const val KEY_NOTIF_ENABLED = "key_notif_enabled"
-        const val DEFAULT_AUTH_TOKEN: String? = null
+        val DEFAULT_AUTH_TOKEN: String? = null
     }
 
     var apiBaseUrl: String

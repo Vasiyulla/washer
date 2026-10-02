@@ -46,6 +46,9 @@ async def _check_offline_devices() -> None:
             if not last:
                 continue
 
+            if last.tzinfo is None:
+                last = last.replace(tzinfo=timezone.utc)
+
             elapsed = (now - last).total_seconds()
             if elapsed > timeout:
                 logger.warning(
