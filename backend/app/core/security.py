@@ -4,7 +4,7 @@ FastAPI dependencies for user and device authentication.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Annotated
+from typing import Annotated, Optional
 from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException, status
