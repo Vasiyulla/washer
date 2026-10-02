@@ -12,6 +12,7 @@
  */
 
 #include <Arduino.h>
+#include <WiFi.h>
 #include "config.h"
 #include "vibration.h"
 #include "network.h"
@@ -42,19 +43,20 @@ void setup() {
     Serial.println("╚══════════════════════════════════════╝");
     Serial.println();
 
-    // 1. Connect to WiFi
+    // 1. Initialize sensor (loop until detected so user can adjust SCL/SDA pins)
+    while (!initAccelerometer()) {
+        Serial.println("[MAIN] Waiting for MPU-6050... Please ensure SCL (D22) & SDA (D21) pins make firm contact.");
+        delay(1500);
+    }
+    Serial.println("[MAIN] SUCCESS: MPU-6050 is connected and working!");
+
+    // 2. Connect to WiFi
     setupWiFi();
 
-    // 2. Sync time via NTP (required before sending timestamped data)
+    // 3. Sync time via NTP (required before sending timestamped data)
     syncNTP();
     if (!isTimeSynced()) {
         Serial.println("[MAIN] WARNING: Proceeding without NTP sync!");
-    }
-
-    // 3. Initialize accelerometer
-    if (!initAccelerometer()) {
-        Serial.println("[MAIN] FATAL: Accelerometer init failed. Halting.");
-        while (true) { delay(1000); }
     }
 
     // 4. Send initial heartbeat
@@ -84,6 +86,14 @@ void loop() {
         lastSampleTime = now;
 
         VibrationReading reading = readVibration();
+
+        // Print live reading to Serial every 500ms so user can see it react
+        static unsigned long lastPrint = 0;
+        if (now - lastPrint >= 500) {
+            lastPrint = now;
+            Serial.printf("[VIBRATION LIVE] X: %5.2f | Y: %5.2f | Z: %5.2f | Vibration Deviation: %5.2f m/s²\n",
+                          reading.x, reading.y, reading.z, reading.deviation);
+        }
 
         // Accumulate for averaging
         accX += reading.x;

@@ -1,0 +1,7 @@
+{
+  "name": "WashPulse IoT",
+  "description": "Mobile-first Washing Machine IoT monitoring app with ESP32 accelerometer telemetry, cycle tracking, vibration analytics, and real-time WebSocket sync.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

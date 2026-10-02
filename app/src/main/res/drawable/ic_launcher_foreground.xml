@@ -1,0 +1,60 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Washing Machine Body (centered in 66dp zone, coords: 27..81 x 25..83) -->
+    <path
+        android:fillColor="#F8FAFC"
+        android:pathData="M33,26 L75,26 A8,8 0 0,1 83,34 L83,76 A8,8 0 0,1 75,84 L33,84 A8,8 0 0,1 25,76 L25,34 A8,8 0 0,1 33,26 Z" />
+
+    <!-- Top control panel line -->
+    <path
+        android:fillColor="#E2E8F0"
+        android:pathData="M25,37 L83,37 L83,39 L25,39 Z" />
+
+    <!-- Status display LED pill and buttons -->
+    <path
+        android:fillColor="#0284C7"
+        android:pathData="M31,31 L47,31 A2,2 0 0,1 49,33 L49,33 A2,2 0 0,1 47,35 L31,35 A2,2 0 0,1 29,33 L29,33 A2,2 0 0,1 31,31 Z" />
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M73,33 A2,2 0 1,1 69,33 A2,2 0 1,1 73,33" />
+    <path
+        android:fillColor="#94A3B8"
+        android:pathData="M78,33 A2,2 0 1,1 74,33 A2,2 0 1,1 78,33" />
+
+    <!-- Machine Drum Outer Ring -->
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M54,43 A18,18 0 1,1 53.9,43 Z" />
+
+    <!-- Inner Drum Window -->
+    <path
+        android:fillColor="#0284C7"
+        android:pathData="M54,47 A14,14 0 1,1 53.9,47 Z" />
+
+    <!-- Drum Water Vortex Swirl -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M46,59 C48,54 52,53 55,57 C58,61 62,60 64,57 C63,62 58,65 54,65 C49,65 47,62 46,59 Z" />
+
+    <!-- Center Drum hub -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,58 A3.5,3.5 0 1,1 53.9,58 Z" />
+
+    <!-- IoT WiFi / Vibration Pulse Wave at top-right corner of drum -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#10B981"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:pathData="M72,46 A9,9 0 0,0 72,38" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#10B981"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M76,49 A14,14 0 0,0 76,35" />
+</vector>

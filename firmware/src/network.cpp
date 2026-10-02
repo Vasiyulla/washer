@@ -13,6 +13,7 @@
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <time.h>
+#include <esp_wifi.h>
 
 // ── Module State ─────────────────────────────────────────────────────────────
 
@@ -36,35 +37,48 @@ static int ringCount = 0;
 void setupWiFi() {
     Serial.println("[NETWORK] Starting WiFi setup...");
 
-    WiFiManager wm;
+    // 1. Complete radio reset to clean internal IDF state
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    delay(300);
 
-    // Set timeout for the captive portal (seconds).
-    // If no one configures it within 180s, fall back to hardcoded creds.
-    wm.setConfigPortalTimeout(180);
+    // 2. Enable station mode with active reception and calibrated TX power
+    WiFi.mode(WIFI_STA);
+    WiFi.setSleep(false);
+    // Lower TX power slightly (17dBm) to prevent USB brownout spikes during 4-way handshake
+    WiFi.setTxPower(WIFI_POWER_17dBm);
+    delay(200);
 
-    // Auto-connect: tries saved credentials first, opens portal if they fail.
-    bool connected = wm.autoConnect("SmartWash-Setup", "smartwash");
+    // 3. Connect cleanly
+    Serial.printf("[NETWORK] Connecting directly to SSID '%s'...\n", WIFI_SSID);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-    if (!connected) {
-        Serial.println("[NETWORK] WiFiManager failed, trying hardcoded credentials...");
-        WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 35) {
+        delay(500);
+        Serial.print(".");
+        attempts++;
+    }
+    Serial.println();
 
-        int attempts = 0;
-        while (WiFi.status() != WL_CONNECTED && attempts < 30) {
-            delay(500);
-            Serial.print(".");
-            attempts++;
-        }
-
-        if (WiFi.status() != WL_CONNECTED) {
-            Serial.println("\n[NETWORK] ERROR: WiFi connection failed! Restarting...");
-            ESP.restart();
-        }
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.printf("[NETWORK] SUCCESS: WiFi connected! IP: %s, RSSI: %d dBm\n",
+                      WiFi.localIP().toString().c_str(), WiFi.RSSI());
+        reconnectDelay = RECONNECT_MIN_MS;
+        return;
     }
 
-    Serial.printf("[NETWORK] WiFi connected! IP: %s, RSSI: %d dBm\n",
+    Serial.println("[NETWORK] Direct connection failed. Starting WiFiManager portal (SmartWash-Setup)...");
+    WiFiManager wm;
+    wm.setConfigPortalTimeout(180);
+    if (!wm.startConfigPortal("SmartWash-Setup", "smartwash")) {
+        Serial.println("[NETWORK] Config portal timed out. Retrying...");
+        delay(2000);
+        ESP.restart();
+    }
+
+    Serial.printf("[NETWORK] WiFi connected via portal! IP: %s, RSSI: %d dBm\n",
                   WiFi.localIP().toString().c_str(), WiFi.RSSI());
-    reconnectDelay = RECONNECT_MIN_MS;
 }
 
 // ── NTP Time Sync ────────────────────────────────────────────────────────────

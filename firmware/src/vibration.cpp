@@ -9,6 +9,7 @@
 #include "vibration.h"
 #include "config.h"
 #include <Adafruit_Sensor.h>
+#include <Adafruit_MPU6050.h>
 #include <Adafruit_ADXL345_U.h>
 #include <Wire.h>
 #include <math.h>
@@ -23,7 +24,9 @@ static const int WINDOW_SIZE = 100;  // enough for 15s at ~6 samples/sec
 
 // ── Module State ─────────────────────────────────────────────────────────────
 
+static Adafruit_MPU6050 mpu;
 static Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
+static bool isMpu = false;
 static MachineState currentState = STATE_IDLE;
 
 // Rolling window: circular buffer of (timestamp_ms, deviation) pairs
@@ -76,19 +79,77 @@ static bool windowCheck(float threshold, int duration_sec, bool above) {
 // ── Public API Implementation ────────────────────────────────────────────────
 
 bool initAccelerometer() {
-    Wire.begin(ADXL_SDA_PIN, ADXL_SCL_PIN);
+    Wire.end(); // Clean up any prior bus state
+    delay(50);
 
-    // Try default I2C address 0x53, fallback to 0x1D if ALT ADDRESS is tied high
-    if (!accel.begin(0x53) && !accel.begin(0x1D)) {
-        Serial.println("[VIBRATION] ERROR: ADXL345 not found! Check I2C wiring (SDA=21, SCL=22).");
+    // Physical pin state check before I2C starts
+    pinMode(ADXL_SDA_PIN, INPUT_PULLUP);
+    pinMode(ADXL_SCL_PIN, INPUT_PULLUP);
+    delay(10);
+    int sdaLevel = digitalRead(ADXL_SDA_PIN);
+    int sclLevel = digitalRead(ADXL_SCL_PIN);
+    Serial.printf("[I2C DIAG] Pin physical levels before bus start: SDA(D21)=%s, SCL(D22)=%s\n",
+                  sdaLevel ? "HIGH (OK)" : "LOW (STUCK/SHORT)",
+                  sclLevel ? "HIGH (OK)" : "LOW (STUCK/SHORT)");
+
+    // Try primary pin assignment: SDA=21, SCL=22
+    int sda = ADXL_SDA_PIN;
+    int scl = ADXL_SCL_PIN;
+    Wire.begin(sda, scl, 100000); // 100kHz standard mode
+
+    Serial.printf("[I2C] Scanning bus on SDA=%d, SCL=%d...\n", sda, scl);
+    int nDevices = 0;
+    byte lastError = 0;
+    for (byte address = 1; address < 127; address++) {
+        Wire.beginTransmission(address);
+        byte error = Wire.endTransmission();
+        if (error == 0) {
+            Serial.printf("[I2C] Device found at address 0x%02X!\n", address);
+            nDevices++;
+        } else if (address == 0x68) {
+            lastError = error;
+        }
+    }
+
+    // If not found, try swapped pins (SDA=22, SCL=21) in case wires are reversed
+    if (nDevices == 0) {
+        Serial.printf("[I2C] 0 devices on SDA=21,SCL=22 (err on 0x68=%d). Testing swapped pins (SDA=22, SCL=21)...\n", lastError);
+        Wire.end();
+        delay(50);
+        sda = ADXL_SCL_PIN;
+        scl = ADXL_SDA_PIN;
+        Wire.begin(sda, scl, 100000);
+        for (byte address = 1; address < 127; address++) {
+            Wire.beginTransmission(address);
+            byte error = Wire.endTransmission();
+            if (error == 0) {
+                Serial.printf("[I2C] SWAPPED SUCCESS! Device found at address 0x%02X on SDA=%d, SCL=%d!\n", address, sda, scl);
+                nDevices++;
+            }
+        }
+    }
+
+    if (nDevices == 0) {
+        Serial.println("[I2C] No I2C devices found on bus with either pin configuration!");
+    }
+
+    // Try MPU6050 first (address 0x68 or 0x69)
+    if (mpu.begin(0x68, &Wire) || mpu.begin(0x69, &Wire)) {
+        isMpu = true;
+        mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
+        mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+        Serial.println("[VIBRATION] MPU-6050 accelerometer initialized successfully!");
+    } else if (accel.begin(0x53) || accel.begin(0x1D)) {
+        isMpu = false;
+        accel.setRange(ADXL345_RANGE_16_G);
+        accel.setDataRate(ADXL345_DATARATE_100_HZ);
+        Serial.println("[VIBRATION] ADXL345 accelerometer initialized successfully!");
+    } else {
+        Serial.println("[VIBRATION] ERROR: Neither MPU6050 nor ADXL345 found! Check I2C wiring (SDA=21, SCL=22).");
+        Wire.end();
         return false;
     }
 
-    // Configure sensor ranges: ±16g provides plenty of dynamic range for violent spin cycles
-    accel.setRange(ADXL345_RANGE_16_G);
-    accel.setDataRate(ADXL345_DATARATE_100_HZ);
-
-    Serial.println("[VIBRATION] ADXL345 accelerometer initialized successfully");
     Serial.printf("[VIBRATION] Start threshold: %.2f, Stop threshold: %.2f\n",
                   START_THRESHOLD, STOP_THRESHOLD);
     Serial.printf("[VIBRATION] Start duration: %ds, Stop duration: %ds\n",
@@ -98,13 +159,22 @@ bool initAccelerometer() {
 }
 
 VibrationReading readVibration() {
-    sensors_event_t event;
-    accel.getEvent(&event);
-
     VibrationReading reading;
-    reading.x = event.acceleration.x;
-    reading.y = event.acceleration.y;
-    reading.z = event.acceleration.z;
+
+    if (isMpu) {
+        sensors_event_t a, g, temp;
+        mpu.getEvent(&a, &g, &temp);
+        reading.x = a.acceleration.x;
+        reading.y = a.acceleration.y;
+        reading.z = a.acceleration.z;
+    } else {
+        sensors_event_t event;
+        accel.getEvent(&event);
+        reading.x = event.acceleration.x;
+        reading.y = event.acceleration.y;
+        reading.z = event.acceleration.z;
+    }
+
     reading.magnitude = sqrtf(
         reading.x * reading.x +
         reading.y * reading.y +

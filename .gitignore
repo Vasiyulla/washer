@@ -1,27 +1,33 @@
-# Python & Virtualenv
+*.iml
+.gradle
+.kotlin
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+.env
+debug.keystore
+
+# Python & Backend
+__pycache__/
+*.py[cod]
+*$py.class
+*.db
+*.sqlite
+*.sqlite3
 venv/
 .venv/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.db
-*.sqlite3
-backend/smartwash.db
-.pytest_cache/
-.coverage
-htmlcov/
 
-# Environment Variables
-.env
-!.env.example
-
-# PlatformIO / Firmware
+# PlatformIO & Embedded
+firmware/.pio/
 .pio/
-.vscode/
-.idea/
 
-# OS Files
-.DS_Store
-Thumbs.db
-backend/app - Shortcut.lnk
+# Android & Gradle
+app/build/
+*.apk
+*.aab
+

@@ -25,8 +25,8 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 // WiFi Credentials (fallback if WiFiManager portal is not used)
 // ═══════════════════════════════════════════════════════════════════════════════
-#define WIFI_SSID       "YOUR_SSID"
-#define WIFI_PASSWORD   "YOUR_PASSWORD"
+#define WIFI_SSID       "TP-Link"
+#define WIFI_PASSWORD   "9909132543"
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Backend API
@@ -39,7 +39,7 @@
 // Device Identity
 // ═══════════════════════════════════════════════════════════════════════════════
 #define DEVICE_CODE     "ESP32-001"
-#define DEVICE_API_KEY  "smartwash-device-secret-key-prod"
+#define DEVICE_API_KEY  "dev-device-key-change-in-production"
 #define FIRMWARE_VER    "1.0.0"
 
 // ═══════════════════════════════════════════════════════════════════════════════
