@@ -65,6 +65,66 @@ async def get_db() -> AsyncSession:  # type: ignore[misc]
 
 
 async def init_db() -> None:
-    """Create all tables (used for local dev / SQLite). Alembic handles Postgres."""
+    """Create all tables and seed default user, machine, and ESP32 device."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Seed defaults so the device and app always find their entities on startup
+    try:
+        from sqlalchemy import select
+        from app.models.user import User
+        from app.models.machine import Machine
+        from app.models.device import Device
+        from app.core.security import hash_password
+        import uuid
+
+        async with async_session() as session:
+            # 1. User
+            u_res = await session.execute(select(User).where(User.email == "demo@smartwash.io"))
+            user = u_res.scalar_one_or_none()
+            if not user:
+                user = User(
+                    id=str(uuid.uuid4()),
+                    email="demo@smartwash.io",
+                    name="Demo User",
+                    hashed_password=hash_password("demo1234"),
+                )
+                session.add(user)
+                await session.flush()
+
+            # 2. Machine
+            m_res = await session.execute(select(Machine).where(Machine.machine_code == "WM-001"))
+            machine = m_res.scalar_one_or_none()
+            if not machine:
+                machine = Machine(
+                    id=str(uuid.uuid4()),
+                    owner_id=user.id,
+                    name="Kitchen Washer",
+                    machine_code="WM-001",
+                    start_threshold=2.0,
+                    stop_threshold=0.5,
+                    start_duration_seconds=5,
+                    stop_duration_seconds=15,
+                    offline_timeout_seconds=90,
+                )
+                session.add(machine)
+                await session.flush()
+
+            # 3. Device
+            d_res = await session.execute(select(Device).where(Device.device_code == "ESP32-001"))
+            device = d_res.scalar_one_or_none()
+            if not device:
+                device = Device(
+                    id=str(uuid.uuid4()),
+                    machine_id=machine.id,
+                    device_code="ESP32-001",
+                    firmware_version="1.0.0",
+                    is_online=True,
+                )
+                session.add(device)
+                await session.flush()
+
+            await session.commit()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Default seeding notice: %s", e)

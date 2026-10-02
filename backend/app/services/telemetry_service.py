@@ -37,10 +37,25 @@ async def ingest_telemetry(db: AsyncSession, payload: TelemetryCreate) -> dict:
     )
     device = result.scalar_one_or_none()
     if not device:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Device '{payload.device_id}' not found",
-        )
+        # Auto-provision device for registered machine if available
+        mach_res = await db.execute(select(Machine))
+        first_mach = mach_res.scalars().first()
+        if first_mach:
+            import uuid
+            device = Device(
+                id=str(uuid.uuid4()),
+                machine_id=first_mach.id,
+                device_code=payload.device_id,
+                firmware_version="1.0.0",
+                is_online=True,
+            )
+            db.add(device)
+            await db.flush()
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Device '{payload.device_id}' not found",
+            )
 
     now = datetime.now(timezone.utc)
 
@@ -114,10 +129,24 @@ async def process_heartbeat(
     )
     device = result.scalar_one_or_none()
     if not device:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Device '{device_code}' not found",
-        )
+        mach_res = await db.execute(select(Machine))
+        first_mach = mach_res.scalars().first()
+        if first_mach:
+            import uuid
+            device = Device(
+                id=str(uuid.uuid4()),
+                machine_id=first_mach.id,
+                device_code=device_code,
+                firmware_version=firmware_version or "1.0.0",
+                is_online=True,
+            )
+            db.add(device)
+            await db.flush()
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Device '{device_code}' not found",
+            )
 
     now = datetime.now(timezone.utc)
     device.last_heartbeat = now
