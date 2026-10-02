@@ -61,14 +61,18 @@ data class Device(
 
 @JsonClass(generateAdapter = true)
 data class Telemetry(
-    @Json(name = "device_id") val deviceId: String,
+    @Json(name = "device_id") val deviceId: String = "ESP32-001",
     @Json(name = "status") val status: MachineStatus = MachineStatus.IDLE,
-    @Json(name = "vibration") val vibration: Float,
-    @Json(name = "x") val x: Float,
-    @Json(name = "y") val y: Float,
-    @Json(name = "z") val z: Float,
-    @Json(name = "timestamp") val timestamp: String
-)
+    @Json(name = "machine_status") val machineStatus: MachineStatus? = null,
+    @Json(name = "vibration") val vibration: Float = 0f,
+    @Json(name = "x") val x: Float = 0f,
+    @Json(name = "y") val y: Float = 0f,
+    @Json(name = "z") val z: Float = 0f,
+    @Json(name = "timestamp") val timestamp: String = ""
+) {
+    val currentStatus: MachineStatus
+        get() = machineStatus ?: status
+}
 
 @JsonClass(generateAdapter = true)
 data class WashingCycle(

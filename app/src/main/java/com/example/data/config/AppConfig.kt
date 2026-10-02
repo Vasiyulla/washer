@@ -19,7 +19,7 @@ class AppConfig(context: Context) {
         const val KEY_USER_EMAIL = "key_user_email"
         const val KEY_USER_NAME = "key_user_name"
         const val KEY_NOTIF_ENABLED = "key_notif_enabled"
-        const val DEFAULT_AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjMmMzNmNiYS0zNzhiLTQ2ZDAtYmQwNS05NGFkZDljNTgxZWIiLCJleHAiOjE3ODk3MzI3MzUsInR5cGUiOiJhY2Nlc3MifQ.79N3zGkNrURzCy2v9R2dNYKrqhrGDNxltsFcEQCzcq0"
+        const val DEFAULT_AUTH_TOKEN: String? = null
     }
 
     var apiBaseUrl: String
@@ -35,7 +35,7 @@ class AppConfig(context: Context) {
         }
 
     var authToken: String?
-        get() = prefs.getString(KEY_AUTH_TOKEN, DEFAULT_AUTH_TOKEN)
+        get() = prefs.getString(KEY_AUTH_TOKEN, null)
         set(value) {
             if (value == null) {
                 prefs.edit().remove(KEY_AUTH_TOKEN).apply()
@@ -45,7 +45,7 @@ class AppConfig(context: Context) {
         }
 
     var userEmail: String?
-        get() = prefs.getString(KEY_USER_EMAIL, "test@washpulse.io")
+        get() = prefs.getString(KEY_USER_EMAIL, "demo@smartwash.io")
         set(value) {
             prefs.edit().putString(KEY_USER_EMAIL, value).apply()
         }

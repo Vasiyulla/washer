@@ -24,6 +24,7 @@ import com.example.data.model.NotificationItem
 import com.example.data.model.NotificationType
 import com.example.data.model.Telemetry
 import com.example.data.model.WashingCycle
+import com.example.data.websocket.TelemetryWebSocketClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,6 +42,7 @@ class MachineRepository(
 ) {
     private val tag = "MachineRepository"
     private val scope = CoroutineScope(Dispatchers.IO + Job())
+    val webSocketClient = TelemetryWebSocketClient(config, apiClient.okHttpClient)
 
     // Network connectivity
     private val _isInternetAvailable = MutableStateFlow(true)
@@ -103,6 +105,49 @@ class MachineRepository(
     init {
         monitorNetwork()
         startLiveBackendPolling()
+        listenToWebSocketStream()
+    }
+
+    private fun listenToWebSocketStream() {
+        scope.launch {
+            webSocketClient.telemetryStream.collect { rawTelemetry ->
+                val resolvedStatus = rawTelemetry.currentStatus
+                val telemetry = if (rawTelemetry.status != resolvedStatus) {
+                    rawTelemetry.copy(status = resolvedStatus)
+                } else {
+                    rawTelemetry
+                }
+
+                _latestTelemetry.value = telemetry
+                val current = _recentTelemetryHistory.value.toMutableList()
+                if (current.size >= 30) current.removeAt(0)
+                current.add(telemetry)
+                _recentTelemetryHistory.value = current
+
+                // Sync machine status in real-time
+                _selectedMachine.value?.let { currentMachine ->
+                    if (currentMachine.status != resolvedStatus) {
+                        _selectedMachine.value = currentMachine.copy(status = resolvedStatus)
+                    }
+                }
+                lastSuccessfulPollTimestamp = System.currentTimeMillis()
+                _isDataStale.value = false
+            }
+        }
+    }
+
+    fun selectMachine(machine: Machine) {
+        _selectedMachine.value = machine
+        webSocketClient.connect(machine.id)
+    }
+
+    fun selectMachine(machineId: String) {
+        val found = _machines.value.find { it.id == machineId }
+        if (found != null) {
+            selectMachine(found)
+        } else {
+            webSocketClient.connect(machineId)
+        }
     }
 
     private fun monitorNetwork() {
@@ -173,8 +218,26 @@ class MachineRepository(
     }
 
     private suspend fun fetchMachinesAndBootstrap() {
-        val service = apiClient.createService()
-        val resp = service.getMachines()
+        var service = apiClient.createService()
+        var resp = service.getMachines()
+
+        // Enterprise auto-recovery: If unauthenticated (401), authenticate with demo user seamlessly
+        if (resp.code() == 401) {
+            Log.i(tag, "Session expired or unauthenticated. Auto-authenticating with demo credentials...")
+            try {
+                val loginResp = service.login(LoginRequest("demo@smartwash.io", "demo1234"))
+                if (loginResp.isSuccessful && loginResp.body() != null) {
+                    config.authToken = loginResp.body()!!.accessToken
+                    config.userEmail = "demo@smartwash.io"
+                    config.userName = "Demo User"
+                    service = apiClient.createService()
+                    resp = service.getMachines()
+                }
+            } catch (e: Exception) {
+                Log.w(tag, "Auto-authentication failed: ${e.message}")
+            }
+        }
+
         if (resp.isSuccessful && resp.body() != null) {
             var list = resp.body()!!.map { it.toMachine() }
             if (list.isEmpty()) {
@@ -182,9 +245,9 @@ class MachineRepository(
                 try {
                     val createResp = service.createMachine(
                         MachineCreate(
-                            name = "EcoSpin Smart Pro",
+                            name = "Kitchen Washer",
                             machineCode = "WM-001",
-                            deviceCode = "ESP32-WASH-01"
+                            deviceCode = "ESP32-001"
                         )
                     )
                     if (createResp.isSuccessful && createResp.body() != null) {
@@ -199,6 +262,7 @@ class MachineRepository(
                 _machines.value = list
                 if (_selectedMachine.value == null) {
                     _selectedMachine.value = list[0]
+                    webSocketClient.connect(list[0].id)
                 }
             }
         }

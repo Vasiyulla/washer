@@ -147,6 +147,10 @@ void loop() {
                       sent ? "SENT" : "BUFFERED",
                       payload.vibration, payload.status, sampleCount);
 
+        if (sent) {
+            flushBufferedTelemetry();
+        }
+
         // Reset accumulators
         accX = accY = accZ = accVib = 0;
         sampleCount = 0;

@@ -93,6 +93,7 @@ async def ingest_telemetry(db: AsyncSession, payload: TelemetryCreate) -> dict:
         "y": payload.y,
         "z": payload.z,
         "vibration": payload.vibration,
+        "status": machine.current_status,
         "machine_status": machine.current_status,
     }
 
