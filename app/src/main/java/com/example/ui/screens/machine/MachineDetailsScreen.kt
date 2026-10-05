@@ -68,11 +68,12 @@ fun MachineDetailsScreen(
     val avgVibration by viewModel.avgVibration.collectAsState()
     val peakVibration by viewModel.peakVibration.collectAsState()
 
-    val currentVib = latestTelemetry?.vibration ?: 0.05f
-    val xAcc = latestTelemetry?.x ?: 0.01f
-    val yAcc = latestTelemetry?.y ?: 0.02f
-    val zAcc = latestTelemetry?.z ?: 0.98f
-    val vectorMagnitude = sqrt(xAcc * xAcc + yAcc * yAcc + zAcc * zAcc)
+    val isMachineOnline = selectedMachine?.online == true && selectedMachine?.status != MachineStatus.OFFLINE
+    val currentVib = if (isMachineOnline) (latestTelemetry?.vibration ?: 0f) else 0f
+    val xAcc = if (isMachineOnline) (latestTelemetry?.x ?: 0f) else 0f
+    val yAcc = if (isMachineOnline) (latestTelemetry?.y ?: 0f) else 0f
+    val zAcc = if (isMachineOnline) (latestTelemetry?.z ?: 0f) else 0f
+    val vectorMagnitude = if (isMachineOnline) sqrt(xAcc * xAcc + yAcc * yAcc + zAcc * zAcc) else 0f
 
     Column(
         modifier = modifier
@@ -106,13 +107,13 @@ fun MachineDetailsScreen(
             Box(
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(CyanPrimary.copy(alpha = 0.12f))
+                    .background(if (isMachineOnline) CyanPrimary.copy(alpha = 0.12f) else SlateOffline.copy(alpha = 0.12f))
                     .padding(8.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Memory,
                     contentDescription = null,
-                    tint = CyanPrimary,
+                    tint = if (isMachineOnline) CyanPrimary else SlateOffline,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -158,10 +159,10 @@ fun MachineDetailsScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (currentVib > 2.0f) "Peak Spin" else "Normal",
+                                text = if (!isMachineOnline) "Offline" else if (currentVib > 0.50f) "Peak Spin" else "Normal",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (currentVib > 2.0f) RosePeak else EmeraldOnline
+                                color = if (!isMachineOnline) SlateOffline else if (currentVib > 0.50f) RosePeak else EmeraldOnline
                             )
                         }
 
@@ -169,7 +170,7 @@ fun MachineDetailsScreen(
 
                         // Real-time canvas line chart
                         VibrationChart(
-                            telemetryHistory = telemetryHistory,
+                            telemetryHistory = if (isMachineOnline) telemetryHistory else emptyList(),
                             heightDp = 140
                         )
 
@@ -180,11 +181,13 @@ fun MachineDetailsScreen(
                         // 4 Stats in row: Current, Avg, Peak, Trend
                         val delta = currentVib - avgVibration
                         val trendText = when {
+                            !isMachineOnline -> "No Signal —"
                             delta > 0.03f -> "Rising ↑"
                             delta < -0.03f -> "Falling ↓"
                             else -> "Stable →"
                         }
                         val trendColor = when {
+                            !isMachineOnline -> SlateOffline
                             delta > 0.03f -> RosePeak
                             delta < -0.03f -> CyanPrimary
                             else -> EmeraldOnline
@@ -196,18 +199,18 @@ fun MachineDetailsScreen(
                         ) {
                             TelemetryStatColumn(
                                 label = "CURRENT",
-                                value = "${String.format(Locale.US, "%.2f", currentVib)}g",
-                                color = if (currentVib > 0.50f) RosePeak else CyanPrimary
+                                value = if (isMachineOnline) "${String.format(Locale.US, "%.2f", currentVib)}g" else "0.00g",
+                                color = if (!isMachineOnline) SlateOffline else if (currentVib > 0.50f) RosePeak else CyanPrimary
                             )
                             TelemetryStatColumn(
                                 label = "AVERAGE",
-                                value = "${String.format(Locale.US, "%.2f", avgVibration)}g",
+                                value = if (isMachineOnline) "${String.format(Locale.US, "%.2f", avgVibration)}g" else "0.00g",
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             TelemetryStatColumn(
                                 label = "PEAK",
-                                value = "${String.format(Locale.US, "%.2f", peakVibration)}g",
-                                color = if (peakVibration > 0.50f) RosePeak else AmberWarning
+                                value = if (isMachineOnline) "${String.format(Locale.US, "%.2f", peakVibration)}g" else "0.00g",
+                                color = if (!isMachineOnline) SlateOffline else if (peakVibration > 0.50f) RosePeak else AmberWarning
                             )
                             TelemetryStatColumn(
                                 label = "TREND",
@@ -248,25 +251,35 @@ fun MachineDetailsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Sensors, contentDescription = null, tint = CyanPrimary, modifier = Modifier.size(18.dp))
+                                Icon(
+                                    Icons.Default.Sensors,
+                                    contentDescription = null,
+                                    tint = if (isMachineOnline) CyanPrimary else SlateOffline,
+                                    modifier = Modifier.size(18.dp)
+                                )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Sensor Status", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             }
-                            Text("Operational (Active)", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = EmeraldOnline)
+                            Text(
+                                text = if (isMachineOnline) "Operational (Active)" else "Offline (Powered Down)",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                color = if (isMachineOnline) EmeraldOnline else SlateOffline
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(14.dp))
 
                         // X-axis bar
-                        AxisProgressBar(axis = "X-Axis", value = xAcc, maxRange = 2.0f, color = CyanPrimary)
+                        AxisProgressBar(axis = "X-Axis", value = xAcc, maxRange = 2.0f, color = if (isMachineOnline) CyanPrimary else SlateOffline)
                         Spacer(modifier = Modifier.height(10.dp))
 
                         // Y-axis bar
-                        AxisProgressBar(axis = "Y-Axis", value = yAcc, maxRange = 2.0f, color = IndigoAccent)
+                        AxisProgressBar(axis = "Y-Axis", value = yAcc, maxRange = 2.0f, color = if (isMachineOnline) IndigoAccent else SlateOffline)
                         Spacer(modifier = Modifier.height(10.dp))
 
                         // Z-axis bar
-                        AxisProgressBar(axis = "Z-Axis", value = zAcc, maxRange = 2.0f, color = EmeraldOnline)
+                        AxisProgressBar(axis = "Z-Axis", value = zAcc, maxRange = 2.0f, color = if (isMachineOnline) EmeraldOnline else SlateOffline)
                         Spacer(modifier = Modifier.height(14.dp))
 
                         Row(
@@ -278,7 +291,12 @@ fun MachineDetailsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("Total Vector Magnitude √[x²+y²+z²]:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("${String.format(Locale.US, "%.3f", vectorMagnitude)} g", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CyanPrimary)
+                            Text(
+                                text = if (isMachineOnline) "${String.format(Locale.US, "%.3f", vectorMagnitude)} g" else "0.000 g (Offline)",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isMachineOnline) CyanPrimary else SlateOffline
+                            )
                         }
                     }
                 }
@@ -308,12 +326,17 @@ fun MachineDetailsScreen(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        InfoRow(label = "Machine Name", value = selectedMachine?.name ?: "Washing Machine 01")
-                        InfoRow(label = "Device ID", value = selectedMachine?.deviceId ?: "WM-001")
-                        InfoRow(label = "ESP32 Status", value = device?.espStatus ?: "ONLINE / ACTIVE", isAccent = true)
-                        InfoRow(label = "Firmware Version", value = device?.firmwareVersion ?: "v2.4.1-esp32-freertos")
-                        InfoRow(label = "Installation Date", value = device?.installationDate ?: "2026-02-18")
-                        InfoRow(label = "Sensor IC", value = device?.accelerometerType ?: "ADXL345 (I2C)")
+                        InfoRow(label = "Machine Name", value = selectedMachine?.name ?: "Kitchen Washer")
+                        InfoRow(label = "Device ID", value = selectedMachine?.deviceId ?: "ESP32-001")
+                        InfoRow(
+                            label = "ESP32 Status",
+                            value = if (isMachineOnline) (device?.espStatus ?: "ONLINE / ACTIVE") else "OFFLINE / DISCONNECTED",
+                            isAccent = true,
+                            accentColor = if (isMachineOnline) EmeraldOnline else SlateOffline
+                        )
+                        InfoRow(label = "Firmware Version", value = device?.firmwareVersion ?: "v1.0.0")
+                        InfoRow(label = "Installation Date", value = device?.installationDate ?: "2026-03-12")
+                        InfoRow(label = "Sensor IC", value = device?.accelerometerType ?: "MPU-6050 (6-DOF I2C)")
                     }
                 }
             }
@@ -342,11 +365,28 @@ fun MachineDetailsScreen(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        InfoRow(label = "Wi-Fi Connection", value = "${device?.wifiSsid ?: "Home_IoT_5G"} (${device?.rssi ?: -54} dBm)")
-                        InfoRow(label = "ESP32 Local IP", value = device?.ipAddress ?: "192.168.1.188")
-                        InfoRow(label = "Last Heartbeat", value = device?.lastHeartbeat ?: "Just now")
-                        InfoRow(label = "Last Telemetry Received", value = latestTelemetry?.timestamp?.takeLast(9)?.take(8) ?: "Live stream")
-                        InfoRow(label = "Cloud Connection Status", value = "Connected (FastAPI + PostgreSQL)", isAccent = true)
+                        InfoRow(
+                            label = "Wi-Fi Connection",
+                            value = if (isMachineOnline) "${device?.wifiSsid ?: "TP-Link"} (${device?.rssi ?: -53} dBm)" else "Disconnected (No Power)"
+                        )
+                        InfoRow(
+                            label = "ESP32 Local IP",
+                            value = if (isMachineOnline) (device?.ipAddress ?: "192.168.1.36") else "Unavailable (Offline)"
+                        )
+                        InfoRow(
+                            label = "Last Heartbeat",
+                            value = if (isMachineOnline) (device?.lastHeartbeat ?: "Just now") else (selectedMachine?.lastSeen ?: "Offline")
+                        )
+                        InfoRow(
+                            label = "Last Telemetry Received",
+                            value = if (isMachineOnline) (latestTelemetry?.timestamp?.takeLast(9)?.take(8) ?: "Live stream") else "No incoming stream"
+                        )
+                        InfoRow(
+                            label = "Cloud Connection Status",
+                            value = if (isMachineOnline) "Connected (Real-time Stream)" else "Standby (Awaiting Device)",
+                            isAccent = true,
+                            accentColor = if (isMachineOnline) EmeraldOnline else SlateOffline
+                        )
                     }
                 }
             }
@@ -400,7 +440,8 @@ private fun AxisProgressBar(
 private fun InfoRow(
     label: String,
     value: String,
-    isAccent: Boolean = false
+    isAccent: Boolean = false,
+    accentColor: Color = EmeraldOnline
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -412,7 +453,7 @@ private fun InfoRow(
             text = value,
             fontSize = 13.sp,
             fontWeight = if (isAccent) FontWeight.Bold else FontWeight.SemiBold,
-            color = if (isAccent) EmeraldOnline else MaterialTheme.colorScheme.onSurface
+            color = if (isAccent) accentColor else MaterialTheme.colorScheme.onSurface
         )
     }
 }

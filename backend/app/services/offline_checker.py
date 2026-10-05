@@ -19,6 +19,8 @@ from app.models.machine import Machine
 from app.models.machine_event import MachineEvent
 from app.models.notification import Notification
 
+from app.websocket.manager import manager
+
 logger = logging.getLogger(__name__)
 
 _checker_task: asyncio.Task | None = None
@@ -41,7 +43,7 @@ async def _check_offline_devices() -> None:
             if not machine:
                 continue
 
-            timeout = machine.offline_timeout_seconds
+            timeout = min(machine.offline_timeout_seconds or 20, 20)
             last = device.last_heartbeat
             if not last:
                 continue
@@ -82,10 +84,28 @@ async def _check_offline_devices() -> None:
                     )
                     db.add(notification)
 
+                # Broadcast offline status to all WebSocket subscribers immediately
+                await manager.broadcast(
+                    machine.id,
+                    {
+                        "type": "device_offline",
+                        "machine_id": machine.id,
+                        "device_id": device.device_code,
+                        "online": False,
+                        "status": "OFFLINE",
+                        "machine_status": "OFFLINE",
+                        "vibration": 0.0,
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0,
+                        "timestamp": now.isoformat(),
+                    },
+                )
+
         await db.commit()
 
 
-async def _run_checker_loop(interval: int = 30) -> None:
+async def _run_checker_loop(interval: int = 10) -> None:
     """Background loop that runs the offline check every `interval` seconds."""
     while True:
         try:

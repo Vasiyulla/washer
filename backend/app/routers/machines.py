@@ -70,7 +70,7 @@ async def get_machine_status(
         if last.tzinfo is None:
             last = last.replace(tzinfo=timezone.utc)
         now = datetime.now(timezone.utc)
-        timeout = machine.offline_timeout_seconds or 90
+        timeout = min(machine.offline_timeout_seconds or 20, 20)
         is_online = (now - last).total_seconds() <= timeout
 
     current_status = machine.current_status
@@ -156,13 +156,22 @@ async def get_health(
     )
     health = health_result.scalar_one_or_none()
 
+    now = datetime.now(timezone.utc)
+    is_online = False
+    if device and device.is_online and device.last_heartbeat:
+        last = device.last_heartbeat
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        timeout = min(machine.offline_timeout_seconds or 20, 20)
+        is_online = (now - last).total_seconds() <= timeout
+
     return {
         "device_code": device.device_code,
         "firmware_version": device.firmware_version,
-        "is_online": device.is_online,
+        "is_online": is_online,
         "last_heartbeat": device.last_heartbeat.isoformat() if device.last_heartbeat else None,
-        "wifi_rssi": health.wifi_rssi if health else None,
-        "uptime_seconds": health.uptime_seconds if health else None,
+        "wifi_rssi": health.wifi_rssi if (health and is_online) else None,
+        "uptime_seconds": health.uptime_seconds if (health and is_online) else None,
         "last_seen": health.last_seen.isoformat() if health and health.last_seen else None,
     }
 

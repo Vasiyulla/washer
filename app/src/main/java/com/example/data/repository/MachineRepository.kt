@@ -333,8 +333,10 @@ class MachineRepository(
             if (telemResp.isSuccessful && telemResp.body() != null) {
                 val telemList = telemResp.body()!!.map { it.toTelemetry() }
                 if (telemList.isNotEmpty()) {
-                    _recentTelemetryHistory.value = telemList
-                    _latestTelemetry.value = telemList.last()
+                    // Backend returns descending (newest first).
+                    // Most recent reading is first(), and charts display chronological history (reversed).
+                    _latestTelemetry.value = telemList.first()
+                    _recentTelemetryHistory.value = telemList.reversed()
                 } else if (_latestTelemetry.value == null) {
                     // Fallback neutral telemetry if backend database has no rows yet
                     val neutral = Telemetry(
@@ -377,15 +379,15 @@ class MachineRepository(
                 val h = healthResp.body()!!
                 _deviceHealth.value = h.toDeviceHealth(machineId)
                 _device.value = Device(
-                    deviceId = h.deviceCode ?: "ESP32-WASH-01",
-                    espStatus = if (h.isOnline) "ONLINE" else "STANDBY",
-                    firmwareVersion = h.firmwareVersion ?: "v2.4.1-esp32",
+                    deviceId = h.deviceCode ?: "ESP32-001",
+                    espStatus = if (h.isOnline) "ONLINE / ACTIVE" else "OFFLINE / DISCONNECTED",
+                    firmwareVersion = h.firmwareVersion ?: "v1.0.0",
                     installationDate = "2026-03-12",
-                    wifiSsid = "Home_IoT_5G",
-                    rssi = h.wifiRssi?.toInt() ?: -58,
-                    ipAddress = "192.168.1.142",
-                    accelerometerType = "ADXL345 / MPU6050",
-                    lastHeartbeat = h.lastHeartbeat ?: "Just now"
+                    wifiSsid = if (h.isOnline) "TP-Link" else "Disconnected",
+                    rssi = h.wifiRssi?.toInt() ?: -53,
+                    ipAddress = if (h.isOnline) "192.168.1.36" else "--",
+                    accelerometerType = "MPU-6050 (6-DOF I2C)",
+                    lastHeartbeat = h.lastHeartbeat ?: "Offline"
                 )
             }
         } catch (e: Exception) {
