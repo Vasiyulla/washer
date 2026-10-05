@@ -6,12 +6,14 @@ and broadcasts to WebSocket subscribers.
 """
 
 import logging
+import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
+from app.models.machine import Machine
 from app.models.device import Device
 from app.models.telemetry import Telemetry
 from app.models.device_health import DeviceHealth

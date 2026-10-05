@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.StatMetricCard
 import com.example.ui.components.VibrationChart
+import com.example.data.model.MachineStatus
 import com.example.ui.theme.AmberWarning
 import com.example.ui.theme.CyanLight
 import com.example.ui.theme.CyanPrimary
