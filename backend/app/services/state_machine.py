@@ -124,20 +124,29 @@ async def evaluate_state(
             if cycle:
                 cycle.ended_at = timestamp_utc
                 cycle.status = "COMPLETED"
-                cycle.duration_seconds = int(
-                    (timestamp_utc - cycle.started_at).total_seconds()
-                )
+
+                started = cycle.started_at
+                ts = timestamp_utc
+                if started.tzinfo is None and ts.tzinfo is not None:
+                    started = started.replace(tzinfo=timezone.utc)
+                elif started.tzinfo is not None and ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+
+                cycle.duration_seconds = max(0, int((ts - started).total_seconds()))
 
                 # Compute vibration stats from telemetry within the cycle window
-                device = machine.device
-                if device:
+                d_res = await db.execute(
+                    select(Device.id).where(Device.machine_id == machine_id)
+                )
+                dev_id = d_res.scalar_one_or_none()
+                if dev_id:
                     stats_result = await db.execute(
                         select(
                             func.avg(Telemetry.vibration_magnitude),
                             func.max(Telemetry.vibration_magnitude),
                             func.min(Telemetry.vibration_magnitude),
                         )
-                        .where(Telemetry.device_id == device.id)
+                        .where(Telemetry.device_id == dev_id)
                         .where(Telemetry.timestamp_utc >= cycle.started_at)
                         .where(Telemetry.timestamp_utc <= timestamp_utc)
                     )

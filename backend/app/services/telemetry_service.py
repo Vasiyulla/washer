@@ -86,13 +86,15 @@ async def ingest_telemetry(db: AsyncSession, payload: TelemetryCreate) -> dict:
         health.last_seen = now
 
     # 4. Run state machine
-    # Eagerly load the machine relationship
-    machine_result = await db.execute(
-        select(Device).where(Device.id == device.id)
+    mach_res = await db.execute(
+        select(Machine).where(Machine.id == device.machine_id)
     )
-    device = machine_result.scalar_one()
-    await db.refresh(device, ["machine"])
-    machine = device.machine
+    machine = mach_res.scalar_one_or_none()
+    if not machine:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Machine linked to device '{payload.device_id}' not found",
+        )
 
     transition = await state_machine.evaluate_state(
         db, machine, payload.vibration, payload.timestamp

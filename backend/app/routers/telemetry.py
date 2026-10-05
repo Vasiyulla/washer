@@ -18,6 +18,10 @@ from app.schemas.device import HeartbeatRequest
 from app.services import telemetry_service
 from app.websocket.manager import manager
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/api/v1", tags=["device"])
@@ -32,14 +36,23 @@ async def ingest_telemetry(
     db: AsyncSession = Depends(get_db),
 ):
     """Accept telemetry from ESP32 devices, run state machine, broadcast via WebSocket."""
-    broadcast_data = await telemetry_service.ingest_telemetry(db, payload)
+    try:
+        broadcast_data = await telemetry_service.ingest_telemetry(db, payload)
 
-    # Broadcast to WebSocket subscribers
-    machine_id = broadcast_data.get("machine_id")
-    if machine_id:
-        await manager.broadcast(machine_id, broadcast_data)
+        # Broadcast to WebSocket subscribers
+        machine_id = broadcast_data.get("machine_id")
+        if machine_id:
+            await manager.broadcast(machine_id, broadcast_data)
 
-    return {"status": "ok"}
+        return {"status": "ok"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to ingest telemetry for device %s: %s", payload.device_id, e)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Telemetry ingestion internal error: {str(e)}"
+        )
 
 
 @router.post("/devices/{device_code}/heartbeat")
