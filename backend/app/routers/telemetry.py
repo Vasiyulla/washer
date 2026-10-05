@@ -49,11 +49,32 @@ async def heartbeat(
     _key: str = Depends(verify_device_api_key),
     db: AsyncSession = Depends(get_db),
 ):
-    """Accept a heartbeat from an ESP32 device."""
-    return await telemetry_service.process_heartbeat(
+    data = await telemetry_service.process_heartbeat(
         db,
         device_code,
         wifi_rssi=payload.wifi_rssi,
         uptime_seconds=payload.uptime_seconds,
         firmware_version=payload.firmware_version,
     )
+
+    # Immediately notify WebSocket subscribers that device is online
+    machine_id = data.get("machine_id")
+    if machine_id:
+        await manager.broadcast(
+            machine_id,
+            {
+                "type": "device_heartbeat",
+                "machine_id": machine_id,
+                "device_id": device_code,
+                "status": "IDLE",
+                "machine_status": "IDLE",
+                "online": True,
+                "vibration": 0.0,
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.0,
+                "timestamp": data.get("timestamp"),
+            },
+        )
+
+    return data

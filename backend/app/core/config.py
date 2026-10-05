@@ -28,16 +28,16 @@ class Settings(BaseSettings):
     # ── Device Auth ───────────────────────────────────────────────────────────
     DEVICE_API_KEY: str = "dev-device-key-change-in-production"
 
-    # ── State Machine Defaults ────────────────────────────────────────────────
+    # ── State Machine Defaults (in g units) ───────────────────────────────────
     # Applied when creating a new Machine; each Machine stores its own copy.
-    DEFAULT_START_THRESHOLD: float = 2.0
-    DEFAULT_STOP_THRESHOLD: float = 0.5
-    DEFAULT_START_DURATION_SECONDS: int = 5
-    DEFAULT_STOP_DURATION_SECONDS: int = 15
+    DEFAULT_START_THRESHOLD: float = 0.10
+    DEFAULT_STOP_THRESHOLD: float = 0.03
+    DEFAULT_START_DURATION_SECONDS: int = 2
+    DEFAULT_STOP_DURATION_SECONDS: int = 6
     DEFAULT_OFFLINE_TIMEOUT_SECONDS: int = 90
 
     # ── Rate Limiting ─────────────────────────────────────────────────────────
-    TELEMETRY_RATE_LIMIT: str = "60/minute"
+    TELEMETRY_RATE_LIMIT: str = "300/minute"
 
 
 settings = Settings()

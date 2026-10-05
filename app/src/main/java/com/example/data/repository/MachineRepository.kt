@@ -126,10 +126,18 @@ class MachineRepository(
                 current.add(telemetry)
                 _recentTelemetryHistory.value = current
 
-                // Sync machine status in real-time
+                // Sync machine status and online state in real-time
                 _selectedMachine.value?.let { currentMachine ->
-                    if (currentMachine.status != resolvedStatus) {
-                        _selectedMachine.value = currentMachine.copy(status = resolvedStatus)
+                    if (currentMachine.status != resolvedStatus || !currentMachine.online) {
+                        val updated = currentMachine.copy(
+                            status = resolvedStatus,
+                            online = true,
+                            lastSeen = "Just now"
+                        )
+                        _selectedMachine.value = updated
+                        _machines.value = _machines.value.map { m ->
+                            if (m.id == updated.id) updated else m
+                        }
                     }
                 }
                 lastSuccessfulPollTimestamp = System.currentTimeMillis()

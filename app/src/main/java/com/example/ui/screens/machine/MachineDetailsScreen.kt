@@ -178,6 +178,18 @@ fun MachineDetailsScreen(
                         Spacer(modifier = Modifier.height(14.dp))
 
                         // 4 Stats in row: Current, Avg, Peak, Trend
+                        val delta = currentVib - avgVibration
+                        val trendText = when {
+                            delta > 0.03f -> "Rising ↑"
+                            delta < -0.03f -> "Falling ↓"
+                            else -> "Stable →"
+                        }
+                        val trendColor = when {
+                            delta > 0.03f -> RosePeak
+                            delta < -0.03f -> CyanPrimary
+                            else -> EmeraldOnline
+                        }
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceAround
@@ -185,7 +197,7 @@ fun MachineDetailsScreen(
                             TelemetryStatColumn(
                                 label = "CURRENT",
                                 value = "${String.format(Locale.US, "%.2f", currentVib)}g",
-                                color = if (currentVib > 2.0f) RosePeak else CyanPrimary
+                                color = if (currentVib > 0.50f) RosePeak else CyanPrimary
                             )
                             TelemetryStatColumn(
                                 label = "AVERAGE",
@@ -195,12 +207,12 @@ fun MachineDetailsScreen(
                             TelemetryStatColumn(
                                 label = "PEAK",
                                 value = "${String.format(Locale.US, "%.2f", peakVibration)}g",
-                                color = if (peakVibration > 2.0f) RosePeak else AmberWarning
+                                color = if (peakVibration > 0.50f) RosePeak else AmberWarning
                             )
                             TelemetryStatColumn(
                                 label = "TREND",
-                                value = if (currentVib > avgVibration) "Rising ↑" else "Steady →",
-                                color = if (currentVib > avgVibration) CyanPrimary else EmeraldOnline
+                                value = trendText,
+                                color = trendColor
                             )
                         }
                     }

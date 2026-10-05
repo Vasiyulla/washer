@@ -101,10 +101,10 @@ async def init_db() -> None:
                     owner_id=user.id,
                     name="Kitchen Washer",
                     machine_code="WM-001",
-                    start_threshold=2.0,
-                    stop_threshold=0.5,
-                    start_duration_seconds=5,
-                    stop_duration_seconds=15,
+                    start_threshold=0.10,
+                    stop_threshold=0.03,
+                    start_duration_seconds=2,
+                    stop_duration_seconds=6,
                     offline_timeout_seconds=90,
                 )
                 session.add(machine)

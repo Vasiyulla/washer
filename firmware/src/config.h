@@ -60,27 +60,27 @@
 #define SAMPLE_INTERVAL_MS  (1000 / SAMPLE_RATE_HZ)
 
 // How often to POST telemetry to the backend (milliseconds).
-// Don't set this too low — the backend rate-limits at 60/minute by default.
-#define SEND_INTERVAL_MS    3000
+// 1000ms gives real-time high-speed streaming directly to app WebSocket.
+#define SEND_INTERVAL_MS    1000
 
 // Heartbeat interval when no state change has occurred (milliseconds).
-#define HEARTBEAT_INTERVAL_MS 30000
+#define HEARTBEAT_INTERVAL_MS 15000
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Vibration Thresholds — CALIBRATE THESE PER MACHINE
+// Vibration Thresholds in g units — CALIBRATE THESE PER MACHINE
 // ═══════════════════════════════════════════════════════════════════════════════
-// Vibration deviation above this = machine is running.
-// "Deviation" = abs(sqrt(x²+y²+z²) - 9.81), i.e., how far from stationary.
-#define START_THRESHOLD     2.0f
+// Vibration deviation above this (in g) = machine is running.
+// With resting calibration, idle noise is ~0.00-0.02g.
+#define START_THRESHOLD     0.10f
 
 // Vibration deviation below this for sustained period = cycle ended.
-#define STOP_THRESHOLD      0.5f
+#define STOP_THRESHOLD      0.03f
 
-// How many seconds vibration must stay above START_THRESHOLD to confirm start.
-#define START_DURATION_SEC  5
+// How many seconds vibration must average above START_THRESHOLD to confirm start.
+#define START_DURATION_SEC  2
 
-// How many seconds vibration must stay below STOP_THRESHOLD to confirm stop.
-#define STOP_DURATION_SEC   15
+// How many seconds vibration must average below STOP_THRESHOLD to confirm stop.
+#define STOP_DURATION_SEC   6
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Network Resilience

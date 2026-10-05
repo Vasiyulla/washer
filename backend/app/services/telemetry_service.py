@@ -167,4 +167,9 @@ async def process_heartbeat(
             health.uptime_seconds = uptime_seconds
 
     await db.flush()
-    return {"status": "ok", "device_code": device_code, "timestamp": now.isoformat()}
+    return {
+        "status": "ok",
+        "device_code": device_code,
+        "machine_id": device.machine_id,
+        "timestamp": now.isoformat(),
+    }

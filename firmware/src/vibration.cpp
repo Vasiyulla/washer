@@ -14,9 +14,6 @@
 #include <Wire.h>
 #include <math.h>
 
-// ── Constants ────────────────────────────────────────────────────────────────
-
-static const float GRAVITY = 9.81f;
 
 // Rolling window size = duration * sample rate, but we only evaluate at
 // send intervals, so we track timestamps instead of fixed-size arrays.
@@ -39,6 +36,9 @@ static TimedReading window[WINDOW_SIZE];
 static int windowHead = 0;
 static int windowCount = 0;
 
+static const float G = 9.80665f;
+static float baseline = 1.0f;
+
 // ── Private Helpers ──────────────────────────────────────────────────────────
 
 static void addToWindow(float deviation) {
@@ -49,31 +49,46 @@ static void addToWindow(float deviation) {
 }
 
 /**
- * Check if all readings in the last `duration_sec` seconds satisfy a condition.
- * `above` = true  → check all > threshold
- * `above` = false → check all < threshold
- * Returns false if fewer than 2 readings exist in the window.
+ * Check if the rolling average of readings in the last `duration_sec` seconds satisfies threshold.
+ * Prevents oscillatory zero-crossing dips from prematurely resetting state.
  */
-static bool windowCheck(float threshold, int duration_sec, bool above) {
-    unsigned long now = millis();
-    unsigned long cutoff = now - (unsigned long)(duration_sec * 1000);
+static bool windowAvgCheck(float threshold, int duration_sec, bool above) {
+    unsigned long cutoff = millis() - (unsigned long)(duration_sec * 1000UL);
+    float sum = 0;
     int count = 0;
-    bool allSatisfy = true;
 
     for (int i = 0; i < windowCount; i++) {
         int idx = (windowHead - 1 - i + WINDOW_SIZE) % WINDOW_SIZE;
         if (window[idx].timestamp_ms < cutoff) break;
 
+        sum += window[idx].deviation;
         count++;
-        if (above) {
-            if (window[idx].deviation <= threshold) { allSatisfy = false; break; }
-        } else {
-            if (window[idx].deviation >= threshold) { allSatisfy = false; break; }
-        }
     }
 
-    // Need at least 2 readings to be confident
-    return (count >= 2) && allSatisfy;
+    if (count < 5) return false;
+    float avg = sum / count;
+    return above ? (avg > threshold) : (avg < threshold);
+}
+
+static void calibrateBaseline() {
+    Serial.println("[VIBRATION] Calibrating resting baseline in g (keep sensor still)...");
+    float sum = 0;
+    const int N = 200;
+    for (int i = 0; i < N; i++) {
+        sensors_event_t a, g, t;
+        if (isMpu) {
+            mpu.getEvent(&a, &g, &t);
+        } else {
+            accel.getEvent(&a);
+        }
+        float x = a.acceleration.x / G;
+        float y = a.acceleration.y / G;
+        float z = a.acceleration.z / G;
+        sum += sqrtf(x * x + y * y + z * z);
+        delay(5);
+    }
+    baseline = sum / N;
+    Serial.printf("[VIBRATION] Calibration complete. Baseline = %.4f g\n", baseline);
 }
 
 // ── Public API Implementation ────────────────────────────────────────────────
@@ -137,8 +152,8 @@ bool initAccelerometer() {
     if (mpu.begin(0x68, &Wire) || mpu.begin(0x69, &Wire)) {
         isMpu = true;
         mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
-        mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
-        Serial.println("[VIBRATION] MPU-6050 accelerometer initialized successfully!");
+        mpu.setFilterBandwidth(MPU6050_BAND_44_HZ);
+        Serial.println("[VIBRATION] MPU-6050 accelerometer initialized successfully (Bandwidth: 44Hz)!");
     } else if (accel.begin(0x53) || accel.begin(0x1D)) {
         isMpu = false;
         accel.setRange(ADXL345_RANGE_16_G);
@@ -150,7 +165,10 @@ bool initAccelerometer() {
         return false;
     }
 
-    Serial.printf("[VIBRATION] Start threshold: %.2f, Stop threshold: %.2f\n",
+    // Calibrate resting baseline in g
+    calibrateBaseline();
+
+    Serial.printf("[VIBRATION] Start threshold: %.3f g, Stop threshold: %.3f g\n",
                   START_THRESHOLD, STOP_THRESHOLD);
     Serial.printf("[VIBRATION] Start duration: %ds, Stop duration: %ds\n",
                   START_DURATION_SEC, STOP_DURATION_SEC);
@@ -164,15 +182,15 @@ VibrationReading readVibration() {
     if (isMpu) {
         sensors_event_t a, g, temp;
         mpu.getEvent(&a, &g, &temp);
-        reading.x = a.acceleration.x;
-        reading.y = a.acceleration.y;
-        reading.z = a.acceleration.z;
+        reading.x = a.acceleration.x / G;
+        reading.y = a.acceleration.y / G;
+        reading.z = a.acceleration.z / G;
     } else {
         sensors_event_t event;
         accel.getEvent(&event);
-        reading.x = event.acceleration.x;
-        reading.y = event.acceleration.y;
-        reading.z = event.acceleration.z;
+        reading.x = event.acceleration.x / G;
+        reading.y = event.acceleration.y / G;
+        reading.z = event.acceleration.z / G;
     }
 
     reading.magnitude = sqrtf(
@@ -180,9 +198,8 @@ VibrationReading readVibration() {
         reading.y * reading.y +
         reading.z * reading.z
     );
-    // Deviation from gravity baseline — this is the vibration metric.
-    // A stationary sensor reads ~9.81 m/s²; deviation ~0 when still.
-    reading.deviation = fabsf(reading.magnitude - GRAVITY);
+    // Deviation from calibrated resting baseline in g units
+    reading.deviation = fabsf(reading.magnitude - baseline);
 
     return reading;
 }
@@ -190,20 +207,18 @@ VibrationReading readVibration() {
 MachineState evaluateState(float deviation) {
     addToWindow(deviation);
 
-    MachineState previousState = currentState;
-
     switch (currentState) {
         case STATE_IDLE:
-            // Transition to RUNNING if vibration sustained above start threshold
-            if (windowCheck(START_THRESHOLD, START_DURATION_SEC, true)) {
+            // Transition to RUNNING if rolling average vibration is sustained above threshold
+            if (windowAvgCheck(START_THRESHOLD, START_DURATION_SEC, true)) {
                 currentState = STATE_RUNNING;
                 Serial.println("[VIBRATION] *** State transition: IDLE → RUNNING ***");
             }
             break;
 
         case STATE_RUNNING:
-            // Transition to IDLE (completed) if vibration sustained below stop threshold
-            if (windowCheck(STOP_THRESHOLD, STOP_DURATION_SEC, false)) {
+            // Transition to IDLE (completed) if rolling average vibration drops below threshold
+            if (windowAvgCheck(STOP_THRESHOLD, STOP_DURATION_SEC, false)) {
                 currentState = STATE_IDLE;
                 Serial.println("[VIBRATION] *** State transition: RUNNING → IDLE (cycle complete) ***");
             }

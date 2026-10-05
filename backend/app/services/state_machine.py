@@ -33,22 +33,21 @@ _vibration_windows: dict[str, deque] = defaultdict(lambda: deque(maxlen=500))
 
 
 def _window_all_above(window: deque, threshold: float, duration_seconds: int, now: datetime) -> bool:
-    """Check if all readings in the last `duration_seconds` exceed `threshold`."""
+    """Check if the average reading in the last `duration_seconds` exceeds `threshold`."""
     cutoff = now.timestamp() - duration_seconds
     recent = [v for t, v in window if t.timestamp() >= cutoff]
-    # Need at least 2 readings to be confident (avoid false trigger on a single point).
     if len(recent) < 2:
         return False
-    return all(v > threshold for v in recent)
+    return (sum(recent) / len(recent)) > threshold
 
 
 def _window_all_below(window: deque, threshold: float, duration_seconds: int, now: datetime) -> bool:
-    """Check if all readings in the last `duration_seconds` are below `threshold`."""
+    """Check if the average reading in the last `duration_seconds` is below `threshold`."""
     cutoff = now.timestamp() - duration_seconds
     recent = [v for t, v in window if t.timestamp() >= cutoff]
     if len(recent) < 2:
         return False
-    return all(v < threshold for v in recent)
+    return (sum(recent) / len(recent)) < threshold
 
 
 async def evaluate_state(

@@ -64,6 +64,17 @@ void setup() {
         Serial.println("[MAIN] Initial heartbeat sent");
     }
 
+    // 5. Send initial telemetry reading immediately so the app shows active instantly
+    VibrationReading reading = readVibration();
+    TelemetryPayload initialPayload;
+    initialPayload.x = reading.x;
+    initialPayload.y = reading.y;
+    initialPayload.z = reading.z;
+    initialPayload.vibration = reading.deviation;
+    initialPayload.status = stateToString(getCurrentState());
+    sendTelemetry(initialPayload);
+    Serial.println("[MAIN] Initial telemetry sent — machine active in app immediately!");
+
     Serial.println("[MAIN] Setup complete — entering main loop");
     Serial.println();
 }

@@ -34,7 +34,7 @@ fun VibrationChart(
     telemetryHistory: List<Telemetry>,
     modifier: Modifier = Modifier,
     heightDp: Int = 160,
-    warningThreshold: Float = 2.0f
+    warningThreshold: Float = 0.50f
 ) {
     val primaryColor = CyanLight
     val gridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
@@ -43,14 +43,14 @@ fun VibrationChart(
     // Extract vibration values
     val values = remember(telemetryHistory) {
         if (telemetryHistory.isEmpty()) {
-            listOf(0.05f, 0.05f)
+            listOf(0.01f, 0.01f)
         } else {
             telemetryHistory.map { it.vibration }
         }
     }
 
     val maxVal = remember(values) {
-        (values.maxOrNull() ?: 2.5f).coerceAtLeast(2.5f)
+        (values.maxOrNull() ?: 0.60f).coerceAtLeast(0.60f)
     }
     val minVal = 0.0f
 
@@ -69,8 +69,8 @@ fun VibrationChart(
 
             if (values.size < 2) return@Canvas
 
-            // 1. Grid horizontal lines (0.0g, 1.0g, 2.0g, max)
-            val gridSteps = listOf(0.0f, 1.0f, 2.0f)
+            // 1. Grid horizontal lines (0.0g, 0.25g, 0.50g)
+            val gridSteps = listOf(0.0f, 0.25f, 0.50f)
             gridSteps.forEach { stepVal ->
                 val normY = (stepVal - minVal) / (maxVal - minVal)
                 val y = height - paddingBottom - (normY * chartHeight)
@@ -82,7 +82,7 @@ fun VibrationChart(
                 )
             }
 
-            // 2. Threshold Warning Line (2.0g)
+            // 2. Threshold Warning Line (0.50g)
             val threshNormY = (warningThreshold - minVal) / (maxVal - minVal)
             val threshY = height - paddingBottom - (threshNormY * chartHeight)
             val dashedEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f), 0f)
@@ -140,7 +140,7 @@ fun VibrationChart(
             drawPath(
                 path = linePath,
                 brush = Brush.horizontalGradient(
-                    colors = listOf(CyanPrimary, CyanLight, if (values.last() > 2.0f) RosePeak else CyanLight)
+                    colors = listOf(CyanPrimary, CyanLight, if (values.last() > warningThreshold) RosePeak else CyanLight)
                 ),
                 style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
             )
@@ -148,12 +148,12 @@ fun VibrationChart(
             // Draw Current Telemetry Glowing Dot at last point
             val lastPoint = points.last()
             drawCircle(
-                color = if (values.last() > 2.0f) RosePeak.copy(alpha = 0.35f) else CyanLight.copy(alpha = 0.35f),
+                color = if (values.last() > warningThreshold) RosePeak.copy(alpha = 0.35f) else CyanLight.copy(alpha = 0.35f),
                 radius = 8.dp.toPx(),
                 center = lastPoint
             )
             drawCircle(
-                color = if (values.last() > 2.0f) RosePeak else Color.White,
+                color = if (values.last() > warningThreshold) RosePeak else Color.White,
                 radius = 4.dp.toPx(),
                 center = lastPoint
             )
@@ -161,7 +161,7 @@ fun VibrationChart(
 
         // Top labels
         Text(
-            text = "2.0g Limit",
+            text = "${String.format(Locale.US, "%.1fg", warningThreshold)} Limit",
             style = TextStyle(fontSize = 10.sp, color = AmberWarning, fontWeight = FontWeight.Bold),
             modifier = Modifier
                 .align(Alignment.TopEnd)
